@@ -1,0 +1,76 @@
+function listAllFilesV2() {
+  var rootFolderName = 'z v4-mpkb HNN';
+
+  console.log('v2.0 Scanning: ' + rootFolderName);
+
+  var rootFolders = DriveApp.getFoldersByName(rootFolderName);
+  if (!rootFolders.hasNext()) {
+    console.log('ERROR: Folder not found');
+    return;
+  }
+  var rootFolder = rootFolders.next();
+  console.log('Root OK: ' + rootFolder.getName());
+
+  var ss = SpreadsheetApp.create('Drive Files v2 - z v4-mpkb HNN (Hyperlinked)');
+  var sheet = ss.getActiveSheet();
+  
+  // Headers
+  sheet.appendRow(['File Name', 'Folder Path', 'URL', 'File ID', 'Updated', 'Size KB']);
+  sheet.getRange('A1:F1').setFontWeight('bold');
+
+  try {
+    processFolder(rootFolder, rootFolder.getName(), sheet);
+    // Auto-fit & sort by path
+    sheet.autoResizeColumns(1, 6);
+    sheet.sort(2);  // Path column
+    console.log('v2.0 SUCCESS! https://docs.google.com/spreadsheets/d/' + ss.getId());
+  } catch (e) {
+    console.log('ERROR: ' + e);
+  }
+  
+  SpreadsheetApp.setActiveSpreadsheet(ss);
+}
+
+function processFolder(folder, path, sheet) {
+  try {
+    console.log('Processing: ' + path);
+    
+    var files = folder.getFiles();
+    var row = sheet.getLastRow() + 1;  // Next row
+    var fileCount = 0;
+    
+    while (files.hasNext()) {
+      fileCount++;
+      var file = files.next();
+      var fileName = file.getName();
+      var fileUrl = file.getUrl();
+      var fileId = file.getId();
+      var updated = file.getLastUpdated();
+      var sizeKB = Math.round((file.getSize() || 0) / 1024);
+      
+      // Column A: Hyperlinked name
+      var nameRange = sheet.getRange(row, 1);
+      nameRange.setValue(fileName);
+      nameRange.setFormula('=HYPERLINK("' + fileUrl + '", "' + fileName + '")');
+      
+      // Other columns plain text
+      sheet.getRange(row, 2).setValue(path);
+      sheet.getRange(row, 3).setValue(fileUrl);
+      sheet.getRange(row, 4).setValue(fileId);
+      sheet.getRange(row, 5).setValue(updated);
+      sheet.getRange(row, 6).setValue(sizeKB);
+      
+      row++;
+    }
+    console.log(path + ': ' + fileCount + ' hyperlinked files');
+
+    // Subfolders
+    var subFolders = folder.getFolders();
+    while (subFolders.hasNext()) {
+      var subFolder = subFolders.next();
+      processFolder(subFolder, path + ' / ' + subFolder.getName(), sheet);
+    }
+  } catch (e) {
+    console.log('Folder error ' + path + ': ' + e);
+  }
+}
